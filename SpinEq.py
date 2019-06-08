@@ -3,8 +3,10 @@
 """
 Spineq.py
 
-Created by Marc-Andre' on 2011-04-12.
+First version created by Marc-Andre' on 2011-04-12.
 Copyright (c) 2011 IGBMC. All rights reserved.
+
+Developped since then by Marc-André Delsuc and Bruno Kieffer in IGBMC (Strasbourg)
 
 This program computes chemical equilibria along with NMR magnetization evolution.
 
@@ -31,14 +33,15 @@ Precision = 1e-8    # precision used in ode integration
 
 from __future__ import print_function, division
 
-name = 'Spineq'
-license = "Cecill 2.0"
+name = 'SpinEq'
+license = "CeCILL 2.1"
 authors = 'Marc-Andre'' Delsuc <madelsuc@unistra.fr> and Bruno Kieffer <kieffer@igbmc.fr>'
-version = "4 Apr 2017"
+version = "7 June 2019"
 
 import numpy as np
 np.set_printoptions(precision=5, threshold=None, edgeitems=None, linewidth=120, suppress=None, nanstr=None, infstr=None)
-from scipy import integrate
+from scipy import integrate   # Import the ODE module
+from scipy import linalg      # Import the linear algebra module
 
 Debug = False
 KinMax = 1E8        # the fastest kinetic speed possible
@@ -743,6 +746,47 @@ class Rates():
        temperature should be in Kelvin
        returns a tauc in ns """
        return 1E-9*np.exp(2416/temp)*nres**(0.93)*0.00918/temp    
+##################################################
+def gen_fid(TD=2048, dt=250E-6, noise=10., res_list=None, K=None, all_freq=True):
+    ''' Create a synthetic FID from a list of resonances and acquisition parameters
+        TD time domain number of points
+        dt dwell time in seconds
+        noise : level of noise  # Not implemented
+        res_list : a list of resonances [I, W, R2] where I is the intensity, W the pulsation and R2 the transverse
+                   relaxation rate.
+        K is an exchange matrix between the resonances
+        all_freq : if true, all components of the signal are summed up
+    '''
+    
+    # Handle resonances, Build a diagonal matrix containing the frequencies and the damping factors
+    NS = len(res_list)        # Number of signals (resonances)
+    rlm = np.array(res_list)  # Convert the resonance list into array (for vector calculations)
+    VR2 = rlm[:,2]            # Vector of transverse relaxation rates
+    VW = rlm[:,1]             # Vector of frequencies (pulsations in rad.s-1)
+    VI = np.matrix(rlm[:,0])  # Vector of intensities
+    B = -VR2-1j*VW            # Vector of exponential factors (damping + pulsation)
+    K = np.matrix(K)          # Matrix of chemical exchange rates (is s-1)
+    
+    MB = np.diag(B)            # The elements of B vector are the diagonal elements of a matrix
+    if (MB.size == K.size):    # If the size of the BN matrix matches the size of the exchange matrix
+        A = MB + K             # Then the exponential factor is a matrix that contains off diagonal terms
+        DA, W = np.linalg.eig(A)       # Diagonalize the matrix
+    else:
+        DA = B                 # If not the exponential factor is a diagonal matrix
+    
+    # Build the FID
+    time = np.arange(TD)*dt   # Build the time sampling vector
+    FID = np.zeros((NS,TD),dtype=complex)
+    for i,t in enumerate(time):            # Build the time evolution of transverse magnetization
+        temp = np.exp(DA*t)*VI.T
+        FID[:,i] =  temp.T                 # lines of the FID array contain the different frequency
+                                           # and columns the sampled points
+        
+        
+    if all_freq:     
+        FID = np.cumsum(FID,axis = 0)      # sum up the different frequency contributions to a single FID
+        FID = FID[-1,:]
+    return FID
 ##################################################
 # tests
 ##################################################
