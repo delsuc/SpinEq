@@ -45,5 +45,5 @@ It contains:
 - Saturation Transfer Difference (STD) in a simple system, and with 2 sites in competitions
 
 ## Licence
-This code is release under the CeCILL 2.1 licence - equivalent to GPL
+This code is release under the [CeCILL 2.1 licence](Licence_CeCILL_V2.1-en.txt) - equivalent to GPL
 
